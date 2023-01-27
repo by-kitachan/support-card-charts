@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 interface Row {
+  デフォルト表示: string;
+  連番ID: string;
   ID: string;
   レア度: string;
   Lv: string;
@@ -39,6 +41,7 @@ interface Row {
   スキル個数: string;
   固有1: string;
   固有2: string;
+  固有必要絆: string;
   固有1効果量: string;
   固有2効果量: string;
 }

@@ -13,7 +13,7 @@ import {
   Td,
   TableContainer,
   Flex,
-  Tfoot,
+  Container,
 } from '@chakra-ui/react';
 import {
   Chart as ChartJS,
@@ -27,9 +27,11 @@ import {
   ChartOptions,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { useCallback, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import useCardTable, { Row } from '@src/useCardTable';
-import cardTable from '@src/json/card_table.json';
+import useCalc from '@src/useCalc';
+import { icons } from '@src/tools/icons';
+import { Select as Select2, chakraComponents } from 'chakra-react-select';
 
 ChartJS.register(
   CategoryScale,
@@ -43,6 +45,7 @@ ChartJS.register(
 
 const options: ChartOptions = {
   responsive: true,
+  maintainAspectRatio: false,
   plugins: {
     legend: {
       display: false,
@@ -53,20 +56,15 @@ const options: ChartOptions = {
   },
 };
 const labels = ['0凸', '1凸', '2凸', '3凸', '完凸'];
-const data = {
-  labels,
-  datasets: [
-    {
-      label: 'キャラ1',
-      data: [10, 20, 30, 40, 50],
-      borderColor: 'rgb(255, 99, 132)',
-    },
-    {
-      label: 'キャラ2',
-      data: [20, 25, 30, 35, 40],
-      borderColor: 'rgb(53, 162, 235)',
-    },
-  ],
+
+const customComponents: {
+  Option: ({ children, ...props }: any) => any;
+} = {
+  Option: ({ children, ...props }) => (
+    <chakraComponents.Option {...props}>
+      {props.data.icon} {children}
+    </chakraComponents.Option>
+  ),
 };
 
 export default function Home() {
@@ -88,9 +86,11 @@ export default function Home() {
     trainingTypes,
     peculiars,
     setPeculiar,
+    renbanIds,
   } = useCardTable();
 
   const [selects, setSelects] = useState<Row[]>([]);
+  const [selectsWithoutTotsu, setSelectsWithoutTotsu] = useState<Row[][]>([]);
   const canAdd = useMemo(() => {
     return !!selected;
   }, [selected]);
@@ -109,6 +109,20 @@ export default function Home() {
       }
     });
   }, [selected]);
+
+  useEffect(() => {
+    setSelectsWithoutTotsu(() => {
+      return selects.map((s) =>
+        cardTable.filter(
+          (c) =>
+            c['二つ名'] === s['二つ名'] &&
+            c['サポート名'] === s['サポート名'] &&
+            c['特殊固有'] === s['特殊固有'] &&
+            c['グループ'] === s['グループ']
+        )
+      );
+    });
+  }, [cardTable, selects]);
 
   const onDelete = useCallback((id: string) => {
     setSelects((prevState) => prevState.filter((p) => p['ID'] !== id));
@@ -142,6 +156,36 @@ export default function Home() {
     [cardTable]
   );
 
+  const values = useCalc({ selected: selectsWithoutTotsu });
+
+  const tokuiMainData = {
+    labels,
+    datasets: values.map((tmv) => ({
+      label: tmv.card['サポート名'],
+      data: tmv.tokuiMain,
+      borderColor: tmv.borderColor,
+    })),
+  };
+
+  const tokuiOccurData = {
+    labels,
+    datasets: values.map((tmv) => ({
+      label: tmv.card['サポート名'],
+      data: tmv.tokuiOccur,
+      borderColor: tmv.borderColor,
+    })),
+  };
+
+  useEffect(() => {
+    if (otherNames.length === 1) {
+      setOtherName(otherNames[0]);
+    }
+  }, [otherNames, setOtherName]);
+
+  const showThs = useMemo(() => {
+    return {};
+  }, []);
+
   return (
     <>
       <Head>
@@ -150,221 +194,242 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <Box p={4}>
-        <SimpleGrid columns={[1, 2, 3, 4]} spacing="20px">
-          <Select
-            placeholder="レア度"
-            variant="filled"
-            onChange={(e) => setSelectedRare(e.target.value)}
-          >
-            {rares.map((r) => (
-              <option value={r} key={r}>
-                {r}
-              </option>
-            ))}
-          </Select>
-          <Select
-            placeholder="得意練習"
-            variant="filled"
-            onChange={(e) => setSpecialtyTraining(e.target.value)}
-          >
-            {specialtyTrainings.map((st) => (
-              <option value={st} key={st}>
-                {st}
-              </option>
-            ))}
-          </Select>
-          <Select
-            placeholder="カード名"
-            variant="filled"
-            onChange={(e) => setSupportName(e.target.value)}
-          >
-            {supportNames.map((sn) => (
-              <option value={sn} key={sn}>
-                {sn}
-              </option>
-            ))}
-          </Select>
-          <Select
-            placeholder="二つ名"
-            variant="filled"
-            onChange={(e) => setOtherName(e.target.value)}
-          >
-            {otherNames.map((on) => (
-              <option value={on} key={on}>
-                {on}
-              </option>
-            ))}
-          </Select>
-          <Select
-            placeholder="トレ種別"
-            variant="filled"
-            onChange={(e) => setTrainingType(e.target.value)}
-          >
-            {trainingTypes.map((tt) => (
-              <option value={tt} key={tt}>
-                {tt}
-              </option>
-            ))}
-          </Select>
-          {selectedSpecialtyTraining === 'グループ' && (
+      <Container maxW="container.xl">
+        <Box p={4}>
+          <SimpleGrid columns={[1, 2, 3, 4]} spacing="20px">
             <Select
-              placeholder="どの得意練として扱うか"
+              placeholder="レア度"
               variant="filled"
-              onChange={(e) => setGroupSpecialtyTraining(e.target.value)}
+              onChange={(e) => setSelectedRare(e.target.value)}
             >
-              {groupSpecialtyTrainings.map((st) => (
+              {rares.map((r) => (
+                <option value={r} key={r}>
+                  {r}
+                </option>
+              ))}
+            </Select>
+            <Select
+              placeholder="得意練習"
+              variant="filled"
+              onChange={(e) => setSpecialtyTraining(e.target.value)}
+            >
+              {specialtyTrainings.map((st) => (
                 <option value={st} key={st}>
                   {st}
                 </option>
               ))}
             </Select>
-          )}
-          {peculiars.length !== 0 && (
             <Select
-              placeholder="特殊固有"
+              placeholder="カード名"
               variant="filled"
-              onChange={(e) => setPeculiar(e.target.value)}
+              onChange={(e) => setSupportName(e.target.value)}
             >
-              {peculiars.map((p) => (
-                <option value={p} key={p}>
-                  {p}
+              {supportNames.map((sn) => (
+                <option value={sn} key={sn}>
+                  {sn}
                 </option>
               ))}
             </Select>
+            <Select2
+              options={otherNames.map((on) => ({
+                value: on,
+                label: on,
+                icon: (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`/card/${
+                      renbanIds.find((id) => id.name === on)?.id
+                    }.png`}
+                    width={32}
+                    alt={on}
+                    style={{ marginRight: 8 }}
+                  />
+                ),
+              }))}
+              placeholder="二つ名"
+              components={customComponents}
+              onChange={(e) => setOtherName(e?.value)}
+            />
+            {selectedSpecialtyTraining === 'グループ' && (
+              <Select
+                placeholder="どの得意練として扱うか"
+                variant="filled"
+                onChange={(e) => setGroupSpecialtyTraining(e.target.value)}
+              >
+                {groupSpecialtyTrainings.map((st) => (
+                  <option value={st} key={st}>
+                    {st}
+                  </option>
+                ))}
+              </Select>
+            )}
+            {peculiars.length !== 0 && (
+              <Select
+                placeholder="特殊固有"
+                variant="filled"
+                onChange={(e) => setPeculiar(e.target.value)}
+              >
+                {peculiars.map((p) => (
+                  <option value={p} key={p}>
+                    {p}
+                  </option>
+                ))}
+              </Select>
+            )}
+            <Button onClick={(e) => canAdd && onAdd()}>追加</Button>
+          </SimpleGrid>
+
+          {tokuiMainData.datasets.length > 0 && (
+            <Tabs mt={8}>
+              <TabList>
+                <Tab>得意Sp抜Lv5期待値</Tab>
+                <Tab>得意練習出現率</Tab>
+              </TabList>
+
+              <TabPanels>
+                <TabPanel>
+                  <Flex mt={8} justifyContent="center" height="400px">
+                    <Line options={options} data={tokuiMainData} />
+                  </Flex>
+                </TabPanel>
+                <TabPanel>
+                  <Flex mt={8} justifyContent="center" height="400px">
+                    <Line options={options} data={tokuiOccurData} />
+                  </Flex>
+                </TabPanel>
+              </TabPanels>
+            </Tabs>
           )}
-          {canAdd && <Button onClick={onAdd}>追加</Button>}
-        </SimpleGrid>
 
-        <Flex mt={8} maxH={400} justifyContent="center">
-          <Line options={options} data={data} />
-        </Flex>
-
-        <Flex justifyContent="flex-end" mb={1}>
-          <Button variant="outline" onClick={() => setSelects([])}>
-            全削除
-          </Button>
-        </Flex>
-        <TableContainer
-          border="1px solid"
-          borderRadius="12px"
-          borderColor="gray.200"
-          p={2}
-        >
-          <Table variant="simple" size="sm">
-            <Thead>
-              <Tr>
-                <Th>レア度</Th>
-                <Th>得意練習</Th>
-                <Th>カード名</Th>
-                <Th>二つ名</Th>
-                <Th>特殊固有</Th>
-                <Th>削除</Th>
-                <Th>Lv</Th>
-                <Th>友情ボナ</Th>
-                <Th>やる気効果</Th>
-                <Th>スピボナ</Th>
-                <Th>スタボナ</Th>
-                <Th>パワボナ</Th>
-                <Th>根性ボナ</Th>
-                <Th>賢さボナ</Th>
-                <Th>トレ効果</Th>
-                <Th>初期スピ</Th>
-                <Th>初期スタ</Th>
-                <Th>初期パワ</Th>
-                <Th>初期根性</Th>
-                <Th>初期賢さ</Th>
-                <Th>初期絆</Th>
-                <Th>レースボナ</Th>
-                <Th>ファンボナ</Th>
-                <Th>ヒントLv</Th>
-                <Th>ヒント率</Th>
-                <Th>得意率</Th>
-                <Th>イベ回復</Th>
-                <Th>イベ効果</Th>
-                <Th>失敗率</Th>
-                <Th>体力消費</Th>
-                <Th>Spボナ</Th>
-                <Th>友情回復</Th>
-                <Th>スキル個数</Th>
-                <Th>固有1</Th>
-                <Th>固有2</Th>
-                <Th>固有1効果量</Th>
-                <Th>固有2効果量</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {selects.map((s) => (
-                <Tr key={s['ID']}>
-                  <Td>{s['レア度']}</Td>
-                  <Td>{s['得意トレ']}</Td>
-                  <Td>{s['サポート名']}</Td>
-                  <Td>{s['二つ名']}</Td>
-                  <Td>{s['特殊固有']}</Td>
-                  <Td>
-                    <Button
-                      variant="outline"
-                      onClick={() => onDelete(s['ID'])}
-                      size="sm"
-                    >
-                      削除
-                    </Button>
-                  </Td>
-                  <Td minW={100}>
-                    <Select
-                      placeholder="Lv"
-                      variant="filled"
-                      defaultValue={s['Lv']}
-                      onChange={(e) => onLvChange(e.target.value, s)}
-                      size="sm"
-                    >
-                      {(s['レア度'] === 'SR'
-                        ? ['25', '30', '35', '40', '45']
-                        : ['30', '35', '40', '45', '50']
-                      ).map((r) => (
-                        <option value={r} key={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </Select>
-                  </Td>
-                  <Td>{s['友情ボナ']}</Td>
-                  <Td>{s['やる気効果']}</Td>
-                  <Td>{s['スピボナ']}</Td>
-                  <Td>{s['スタボナ']}</Td>
-                  <Td>{s['パワボナ']}</Td>
-                  <Td>{s['根性ボナ']}</Td>
-                  <Td>{s['賢さボナ']}</Td>
-                  <Td>{s['トレ効果']}</Td>
-                  <Td>{s['初期スピ']}</Td>
-                  <Td>{s['初期スタ']}</Td>
-                  <Td>{s['初期パワ']}</Td>
-                  <Td>{s['初期根性']}</Td>
-                  <Td>{s['初期賢さ']}</Td>
-                  <Td>{s['初期絆']}</Td>
-                  <Td>{s['レースボナ']}</Td>
-                  <Td>{s['ファンボナ']}</Td>
-                  <Td>{s['ヒントLv']}</Td>
-                  <Td>{s['ヒント率']}</Td>
-                  <Td>{s['得意率']}</Td>
-                  <Td>{s['イベ回復']}</Td>
-                  <Td>{s['イベ効果']}</Td>
-                  <Td>{s['失敗率']}</Td>
-                  <Td>{s['体力消費']}</Td>
-                  <Td>{s['Spボナ']}</Td>
-                  <Td>{s['友情回復']}</Td>
-                  <Td>{s['スキル個数']}</Td>
-                  <Td>{s['固有1']}</Td>
-                  <Td>{s['固有2']}</Td>
-                  <Td>{s['固有1効果量']}</Td>
-                  <Td>{s['固有2効果量']}</Td>
-                </Tr>
-              ))}
-            </Tbody>
-            <Tfoot></Tfoot>
-          </Table>
-        </TableContainer>
-      </Box>
+          {tokuiMainData.datasets.length > 0 && (
+            <Flex justifyContent="flex-end" mb={1} mt={4}>
+              <Button variant="outline" onClick={() => setSelects([])}>
+                全削除
+              </Button>
+            </Flex>
+          )}
+          {tokuiMainData.datasets.length > 0 && (
+            <TableContainer
+              border="1px solid"
+              borderRadius="12px"
+              borderColor="gray.200"
+              p={2}
+            >
+              <Table variant="simple" size="sm">
+                <Thead>
+                  <Tr>
+                    <Th>レア度</Th>
+                    <Th>得意練習</Th>
+                    <Th>カード名</Th>
+                    <Th>二つ名</Th>
+                    <Th>特殊固有</Th>
+                    <Th>削除</Th>
+                    <Th>Lv</Th>
+                    <Th>友情ボナ</Th>
+                    <Th>やる気効果</Th>
+                    <Th>スピボナ</Th>
+                    <Th>スタボナ</Th>
+                    <Th>パワボナ</Th>
+                    <Th>根性ボナ</Th>
+                    <Th>賢さボナ</Th>
+                    <Th>トレ効果</Th>
+                    <Th>初期スピ</Th>
+                    <Th>初期スタ</Th>
+                    <Th>初期パワ</Th>
+                    <Th>初期根性</Th>
+                    <Th>初期賢さ</Th>
+                    <Th>初期絆</Th>
+                    <Th>レースボナ</Th>
+                    <Th>ファンボナ</Th>
+                    <Th>ヒントLv</Th>
+                    <Th>ヒント率</Th>
+                    <Th>得意率</Th>
+                    <Th>イベ回復</Th>
+                    <Th>イベ効果</Th>
+                    <Th>失敗率</Th>
+                    <Th>体力消費</Th>
+                    <Th>Spボナ</Th>
+                    <Th>友情回復</Th>
+                    <Th>スキル個数</Th>
+                    <Th>固有1</Th>
+                    <Th>固有2</Th>
+                    <Th>固有1効果量</Th>
+                    <Th>固有2効果量</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {selects.map((s) => (
+                    <Tr key={s['ID']}>
+                      <Td>{s['レア度']}</Td>
+                      <Td>{s['得意トレ']}</Td>
+                      <Td>{s['サポート名']}</Td>
+                      <Td>{s['二つ名']}</Td>
+                      <Td>{s['特殊固有']}</Td>
+                      <Td>
+                        <Button
+                          variant="outline"
+                          onClick={() => onDelete(s['ID'])}
+                          size="sm"
+                        >
+                          削除
+                        </Button>
+                      </Td>
+                      <Td minW={100}>
+                        <Select
+                          placeholder="Lv"
+                          variant="filled"
+                          defaultValue={s['Lv']}
+                          onChange={(e) => onLvChange(e.target.value, s)}
+                          size="sm"
+                        >
+                          {(s['レア度'] === 'SR'
+                            ? ['25', '30', '35', '40', '45']
+                            : ['30', '35', '40', '45', '50']
+                          ).map((r) => (
+                            <option value={r} key={r}>
+                              {r}
+                            </option>
+                          ))}
+                        </Select>
+                      </Td>
+                      <Td>{s['友情ボナ']}</Td>
+                      <Td>{s['やる気効果']}</Td>
+                      <Td>{s['スピボナ']}</Td>
+                      <Td>{s['スタボナ']}</Td>
+                      <Td>{s['パワボナ']}</Td>
+                      <Td>{s['根性ボナ']}</Td>
+                      <Td>{s['賢さボナ']}</Td>
+                      <Td>{s['トレ効果']}</Td>
+                      <Td>{s['初期スピ']}</Td>
+                      <Td>{s['初期スタ']}</Td>
+                      <Td>{s['初期パワ']}</Td>
+                      <Td>{s['初期根性']}</Td>
+                      <Td>{s['初期賢さ']}</Td>
+                      <Td>{s['初期絆']}</Td>
+                      <Td>{s['レースボナ']}</Td>
+                      <Td>{s['ファンボナ']}</Td>
+                      <Td>{s['ヒントLv']}</Td>
+                      <Td>{s['ヒント率']}</Td>
+                      <Td>{s['得意率']}</Td>
+                      <Td>{s['イベ回復']}</Td>
+                      <Td>{s['イベ効果']}</Td>
+                      <Td>{s['失敗率']}</Td>
+                      <Td>{s['体力消費']}</Td>
+                      <Td>{s['Spボナ']}</Td>
+                      <Td>{s['友情回復']}</Td>
+                      <Td>{s['スキル個数']}</Td>
+                      <Td>{s['固有1']}</Td>
+                      <Td>{s['固有2']}</Td>
+                      <Td>{s['固有1効果量']}</Td>
+                      <Td>{s['固有2効果量']}</Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </TableContainer>
+          )}
+        </Box>
+      </Container>
     </>
   );
 }

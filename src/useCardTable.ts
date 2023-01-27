@@ -1,46 +1,7 @@
 import cardTable from '@src/json/card_table.json';
 import { useMemo, useState } from 'react';
 
-export interface Row {
-  ID: string;
-  レア度: string;
-  Lv: string;
-  二つ名: string;
-  サポート名: string;
-  得意トレ: string;
-  グループ: string;
-  特殊固有: string;
-  友情ボナ: string;
-  やる気効果: string;
-  スピボナ: string;
-  スタボナ: string;
-  パワボナ: string;
-  根性ボナ: string;
-  賢さボナ: string;
-  トレ効果: string;
-  初期スピ: string;
-  初期スタ: string;
-  初期パワ: string;
-  初期根性: string;
-  初期賢さ: string;
-  初期絆: string;
-  レースボナ: string;
-  ファンボナ: string;
-  ヒントLv: string;
-  ヒント率: string;
-  得意率: string;
-  イベ回復: string;
-  イベ効果: string;
-  失敗率: string;
-  体力消費: string;
-  Spボナ: string;
-  友情回復: string;
-  スキル個数: string;
-  固有1: string;
-  固有2: string;
-  固有1効果量: string;
-  固有2効果量: string;
-}
+export type Row = typeof cardTable[0];
 
 const useCardTable = () => {
   const [selectedRare, setSelectedRare] = useState<string>();
@@ -57,11 +18,19 @@ const useCardTable = () => {
   }, []);
 
   const specialtyTrainings = useMemo(() => {
-    return ['スピード', 'スタミナ', 'パワー', '賢さ', '友人', 'グループ'];
+    return [
+      'スピード',
+      'スタミナ',
+      'パワー',
+      '根性',
+      '賢さ',
+      '友人',
+      'グループ',
+    ];
   }, []);
 
   const groupSpecialtyTrainings = useMemo(() => {
-    return ['スピード', 'スタミナ', 'パワー', '賢さ'];
+    return ['スピード', 'スタミナ', 'パワー', '根性', '賢さ'];
   }, []);
 
   const supportNames = useMemo(() => {
@@ -71,12 +40,13 @@ const useCardTable = () => {
           .filter((c) => selectedRare === c['レア度'])
           .filter((c) => selectedSpecialtyTraining === c['得意トレ'])
           .map((c) => c['サポート名'])
+          .sort((a, b) => a.localeCompare(b, 'ja'))
       )
     );
   }, [selectedRare, selectedSpecialtyTraining]);
 
-  const otherNames = useMemo(() => {
-    return Array.from(
+  const { otherNames, renbanIds } = useMemo(() => {
+    const otherNames = Array.from(
       new Set(
         cardTable
           .filter((c) => selectedRare === c['レア度'])
@@ -85,6 +55,16 @@ const useCardTable = () => {
           .map((c) => c['二つ名'])
       )
     );
+    return {
+      otherNames,
+      renbanIds: Array.from(
+        new Set(
+          cardTable
+            .filter((c) => otherNames.find((on) => on === c['二つ名']))
+            .map((c) => ({ name: c['二つ名'], id: c['連番ID'] }))
+        )
+      ),
+    };
   }, [selectedRare, selectedSpecialtyTraining, selectedSupportName]);
 
   const peculiars = useMemo(() => {
@@ -110,9 +90,23 @@ const useCardTable = () => {
     const target = cardTable
       .filter((c) => selectedSupportName === c['サポート名'])
       .filter((c) => selectedOtherName === c['二つ名'])
-      .filter((c) => selectedPeculiar === c['特殊固有']);
+      .filter(
+        (c) =>
+          (c['特殊固有'] && selectedPeculiar === c['特殊固有']) ||
+          !c['特殊固有']
+      )
+      .filter(
+        (c) =>
+          (c['グループ'] && selectedGroupSpecialtyTraining === c['グループ']) ||
+          !c['グループ']
+      );
     return target[target.length - 1];
-  }, [selectedOtherName, selectedPeculiar, selectedSupportName]);
+  }, [
+    selectedGroupSpecialtyTraining,
+    selectedOtherName,
+    selectedPeculiar,
+    selectedSupportName,
+  ]);
 
   const trainingTypes = [
     'スピメインLv1',
@@ -443,6 +437,7 @@ const useCardTable = () => {
     setGroupSpecialtyTraining,
     selectedPeculiar,
     setPeculiar,
+    renbanIds,
   };
 };
 
